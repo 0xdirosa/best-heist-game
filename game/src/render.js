@@ -3,7 +3,7 @@
 
 import { ALARM, CAMERA, COIN, CRACK, FIELD, FONT, GUARD, PALETTE, SMOKE, TERMINAL } from './config.js';
 import { SCREEN_BUSTED, SCREEN_CLEAR, SCREEN_PAUSED, SCREEN_PLAY, SCREEN_TITLE, SCREEN_WIN } from './world.js';
-import { mulberry32 } from './random.js';
+import { drawGemFrame, drawMuseum, drawSmokeFrame, museumPattern } from './sprites.js';
 
 /** Draw a vision cone: a soft sector from (x, y) along `angle`. */
 function drawCone(ctx, x, y, angle, half, range, colour) {
@@ -26,138 +26,26 @@ function drawCone(ctx, x, y, angle, half, range, colour) {
   ctx.stroke();
 }
 
-/** A tiny procedural painting, seeded so the same loot always looks the same. */
-function drawMiniArt(ctx, x, y, w, h, seed) {
-  const rng = mulberry32(seed);
-  const skies = [['#2b4a6f', '#e8b23a'], ['#6f2b3a', '#f2c94c'], ['#1f4a3a', '#9be8ff'], ['#4a2b6f', '#e89a3a']];
-  const [top, glow] = skies[Math.floor(rng() * skies.length)];
-  const grad = ctx.createLinearGradient(x, y, x, y + h);
-  grad.addColorStop(0, top);
-  grad.addColorStop(1, '#14101e');
-  ctx.fillStyle = grad;
-  ctx.fillRect(x, y, w, h);
-  ctx.fillStyle = glow;
-  ctx.beginPath();
-  ctx.arc(x + w * (0.25 + rng() * 0.5), y + h * (0.25 + rng() * 0.2), 5 + rng() * 7, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = 'rgba(10, 8, 16, 0.85)';
-  ctx.beginPath();
-  ctx.moveTo(x, y + h);
-  ctx.lineTo(x + w * (0.2 + rng() * 0.3), y + h * (0.35 + rng() * 0.25));
-  ctx.lineTo(x + w * (0.5 + rng() * 0.3), y + h);
-  ctx.closePath();
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(x + w * 0.5, y + h);
-  ctx.lineTo(x + w * (0.6 + rng() * 0.3), y + h * (0.45 + rng() * 0.2));
-  ctx.lineTo(x + w, y + h);
-  ctx.closePath();
-  ctx.fill();
-}
-
-function drawPainting(ctx, loot) {
-  const w = 64;
-  const h = 46;
-  const x = loot.x - w / 2;
-  const y = loot.y - h / 2;
-  ctx.fillStyle = '#c9a227';
-  ctx.fillRect(x - 4, y - 4, w + 8, h + 8);
-  ctx.fillStyle = '#241a10';
-  ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
-  drawMiniArt(ctx, x, y, w, h, loot.art);
-}
-
-function drawLoot(ctx, loot, time) {
+function drawLoot(ctx, loot, time, sprites) {
   if (loot.taken) return;
-  const pulse = 1 + Math.sin(time * 3 + loot.x) * 0.06;
-  ctx.save();
-  ctx.translate(loot.x, loot.y);
-  ctx.scale(pulse, pulse);
   if (loot.kind === 'painting') {
-    ctx.restore();
-    drawPainting(ctx, loot);
+    // Three framed paintings, picked by the loot's own art seed so the
+    // same loot always hangs the same picture.
+    const art = ['painting_a', 'painting_b', 'painting_c'][((loot.art % 3) + 3) % 3];
+    drawMuseum(ctx, sprites, art, loot.x, loot.y, 4);
     return;
   }
-  if (loot.kind === 'bust') {
-    ctx.fillStyle = '#8a6a1f';
-    ctx.fillRect(-16, 10, 32, 8);
-    ctx.fillStyle = '#f2c94c';
-    ctx.beginPath();
-    ctx.arc(0, -2, 13, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#c9962e';
-    ctx.fillRect(-13, -16, 26, 8);
-    ctx.fillStyle = '#fff3c4';
-    ctx.beginPath();
-    ctx.arc(-4, -6, 3, 0, Math.PI * 2);
-    ctx.fill();
-  } else if (loot.kind === 'vase') {
-    ctx.fillStyle = '#3f8f6f';
-    ctx.beginPath();
-    ctx.moveTo(-6, -16);
-    ctx.bezierCurveTo(-14, -6, -12, 8, -5, 14);
-    ctx.lineTo(5, 14);
-    ctx.bezierCurveTo(12, 8, 14, -6, 6, -16);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = '#7fd0a8';
-    ctx.fillRect(-8, -14, 16, 3);
-  } else if (loot.kind === 'diamond') {
-    const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, 34);
-    glow.addColorStop(0, 'rgba(155, 232, 255, 0.55)');
-    glow.addColorStop(1, 'rgba(155, 232, 255, 0)');
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(0, 0, 34, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#9be8ff';
-    ctx.beginPath();
-    ctx.moveTo(0, -16);
-    ctx.lineTo(13, -4);
-    ctx.lineTo(9, 12);
-    ctx.lineTo(-9, 12);
-    ctx.lineTo(-13, -4);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = '#e8fbff';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(-13, -4);
-    ctx.lineTo(13, -4);
-    ctx.moveTo(0, -16);
-    ctx.lineTo(0, 12);
-    ctx.stroke();
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(-4, -7, 2.5, 0, Math.PI * 2);
-    ctx.fill();
-  } else {
-    ctx.fillStyle = '#2f7d5a';
-    ctx.beginPath();
-    ctx.arc(0, 0, 13, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#7fd0a8';
-    ctx.beginPath();
-    ctx.arc(-4, -4, 4, 0, Math.PI * 2);
-    ctx.arc(4, -4, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#f2c94c';
-    ctx.fillRect(-8, 6, 16, 4);
+  if (loot.kind === 'diamond') {
+    drawGemFrame(ctx, sprites, loot.x, loot.y, time);
+    return;
   }
-  ctx.restore();
+  const name = loot.kind === 'bust' ? 'bust' : loot.kind === 'vase' ? 'vase' : 'idol';
+  drawMuseum(ctx, sprites, name, loot.x, loot.y, 2);
 }
 
-function drawThrownCoins(ctx, world) {
+function drawThrownCoins(ctx, world, sprites) {
   for (const coin of world.thrownCoins) {
-    ctx.fillStyle = '#f2c94c';
-    ctx.beginPath();
-    ctx.arc(coin.x, coin.y, 6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#8a6d1f';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(coin.x, coin.y, 3, 0, Math.PI * 2);
-    ctx.stroke();
+    drawMuseum(ctx, sprites, 'coin', coin.x, coin.y, 1.5);
     ctx.strokeStyle = 'rgba(242, 201, 76, 0.6)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
@@ -166,21 +54,12 @@ function drawThrownCoins(ctx, world) {
   }
 }
 
-/** Smoke clouds, drawn over the thief: a grey veil that hides him. */
-function drawSmoke(ctx, world) {
+/** Smoke clouds, drawn over the thief: a pixelfx cloud that hides him. */
+function drawSmoke(ctx, world, sprites) {
   for (const cloud of world.smoke) {
     const fade = Math.min(1, cloud.life / 1.5);
     ctx.globalAlpha = fade;
-    ctx.fillStyle = PALETTE.smoke;
-    ctx.beginPath();
-    ctx.arc(cloud.x, cloud.y, cloud.radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = PALETTE.smokeCore;
-    ctx.beginPath();
-    ctx.arc(cloud.x - 26, cloud.y - 14, 42, 0, Math.PI * 2);
-    ctx.arc(cloud.x + 30, cloud.y + 10, 38, 0, Math.PI * 2);
-    ctx.arc(cloud.x + 6, cloud.y - 30, 34, 0, Math.PI * 2);
-    ctx.fill();
+    drawSmokeFrame(ctx, sprites, cloud.x, cloud.y, cloud.life);
     ctx.globalAlpha = 1;
   }
 }
@@ -221,30 +100,20 @@ function drawCrackDial(ctx, world) {
   }
 }
 
-function drawGuard(ctx, guard, time) {
+function drawGuard(ctx, guard, time, sprites) {
   const alerted = guard.state === 'chase' || guard.state === 'suspect';
   drawCone(ctx, guard.x, guard.y, guard.dir, GUARD.coneHalf, GUARD.coneRange, alerted ? PALETTE.coneGuardAlert : PALETTE.coneGuard);
   ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
   ctx.beginPath();
   ctx.ellipse(guard.x, guard.y + 10, 15, 6, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = PALETTE.guard;
-  ctx.beginPath();
-  ctx.arc(guard.x, guard.y, guard.radius, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = PALETTE.guardTrim;
-  ctx.beginPath();
-  ctx.arc(guard.x, guard.y, guard.radius - 4, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = PALETTE.guard;
-  ctx.beginPath();
-  ctx.arc(guard.x, guard.y - 2, 6, 0, Math.PI * 2);
-  ctx.fill();
+  drawMuseum(ctx, sprites, 'guard_topdown', guard.x, guard.y, 2);
+  // A short brim line over the sprite, so the facing stays readable.
   ctx.strokeStyle = '#101828';
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(guard.x, guard.y);
-  ctx.lineTo(guard.x + Math.cos(guard.dir) * 18, guard.y + Math.sin(guard.dir) * 18);
+  ctx.lineTo(guard.x + Math.cos(guard.dir) * 14, guard.y + Math.sin(guard.dir) * 14);
   ctx.stroke();
   if (alerted) {
     ctx.fillStyle = guard.state === 'chase' ? '#ff5a4e' : '#f2c94c';
@@ -263,35 +132,25 @@ function drawGuard(ctx, guard, time) {
   }
 }
 
-function drawCamera(ctx, cam, down) {
+function drawCamera(ctx, cam, down, sprites) {
   drawCone(ctx, cam.x, cam.y, cam.angle, CAMERA.coneHalf, CAMERA.coneRange, down ? PALETTE.coneCameraDown : PALETTE.coneCamera);
-  ctx.fillStyle = '#20242e';
-  ctx.beginPath();
-  ctx.arc(cam.x, cam.y, 10, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = down ? '#8a8f98' : cam.seeing ? '#ff5a4e' : '#e5534b';
-  ctx.beginPath();
-  ctx.arc(cam.x + Math.cos(cam.angle) * 12, cam.y + Math.sin(cam.angle) * 12, 5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#c9a227';
-  ctx.beginPath();
-  ctx.arc(cam.x, cam.y, 3, 0, Math.PI * 2);
-  ctx.fill();
+  drawMuseum(ctx, sprites, 'camera_dome', cam.x, cam.y, 1.25);
+  if (down) {
+    // The dome's lens stays red in the sprite; a grey dot marks it blind.
+    ctx.fillStyle = 'rgba(140, 140, 150, 0.85)';
+    ctx.beginPath();
+    ctx.arc(cam.x, cam.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
   // No OFFLINE label here: the grey cone and the HUD's CAMERAS DOWN badge
   // already say it, and a label under the top cameras would sit on the
   // objective line and under the bottom camera on the EXIT sign.
 }
 
 /** A security terminal on the wall: amber while live, green once hacked. */
-function drawTerminal(ctx, terminal, time) {
+function drawTerminal(ctx, terminal, time, sprites) {
   const hacked = terminal.hacked;
-  ctx.fillStyle = PALETTE.terminal;
-  ctx.fillRect(terminal.x - 14, terminal.y - 18, 28, 36);
-  ctx.strokeStyle = '#c9a227';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(terminal.x - 14, terminal.y - 18, 28, 36);
-  ctx.fillStyle = hacked ? PALETTE.terminalHacked : PALETTE.terminalScreen;
-  ctx.fillRect(terminal.x - 9, terminal.y - 13, 18, 12);
+  drawMuseum(ctx, sprites, 'terminal', terminal.x, terminal.y, 1.75);
   if (!hacked && Math.sin(time * 4) > 0) {
     ctx.fillStyle = '#ff5a4e';
     ctx.beginPath();
@@ -306,60 +165,33 @@ function drawTerminal(ctx, terminal, time) {
 
 /** The uniform rack in the east gallery: a blue uniform on a hook, or an
  * empty hook once Rook is wearing it. */
-function drawDisguiseRack(ctx, world) {
+function drawDisguiseRack(ctx, world, sprites) {
   const rack = world.disguiseRack;
+  if (!rack.taken) {
+    drawMuseum(ctx, sprites, 'rack_uniform', rack.x, rack.y, 2);
+    ctx.fillStyle = '#c9a227';
+    ctx.font = `bold 9px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.fillText('UNIFORM', rack.x, rack.y + 28);
+    return;
+  }
   ctx.fillStyle = '#241f2e';
   ctx.fillRect(rack.x - 3, rack.y - 22, 6, 44);
   ctx.fillStyle = '#c9a227';
   ctx.beginPath();
   ctx.arc(rack.x, rack.y - 22, 3, 0, Math.PI * 2);
   ctx.fill();
-  if (!rack.taken) {
-    ctx.fillStyle = PALETTE.guard;
-    ctx.beginPath();
-    ctx.moveTo(rack.x - 11, rack.y - 14);
-    ctx.lineTo(rack.x + 11, rack.y - 14);
-    ctx.lineTo(rack.x + 14, rack.y + 14);
-    ctx.lineTo(rack.x - 14, rack.y + 14);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = PALETTE.guardTrim;
-    ctx.fillRect(rack.x - 11, rack.y - 8, 22, 3);
-    ctx.fillStyle = '#c9a227';
-    ctx.font = `bold 9px ${FONT}`;
-    ctx.textAlign = 'center';
-    ctx.fillText('UNIFORM', rack.x, rack.y + 28);
-  }
 }
 
-function drawThief(ctx, world, time) {
+function drawThief(ctx, world, time, sprites) {
   const t = world.thief;
   ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
   ctx.beginPath();
   ctx.ellipse(t.x, t.y + 10, 14, 5, 0, 0, Math.PI * 2);
   ctx.fill();
-  // A disguised Rook wears guard blue, gold ring and all — the player is
-  // still the one with the gold ring.
-  ctx.fillStyle = world.disguised ? PALETTE.guard : PALETTE.thief;
-  ctx.beginPath();
-  ctx.arc(t.x, t.y, t.radius, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = PALETTE.thiefTrim;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(t.x, t.y, t.radius - 2, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.fillStyle = PALETTE.thief;
-  ctx.beginPath();
-  ctx.moveTo(t.x + Math.cos(t.face) * 16, t.y + Math.sin(t.face) * 16);
-  ctx.lineTo(t.x + Math.cos(t.face + 2.5) * 10, t.y + Math.sin(t.face + 2.5) * 10);
-  ctx.lineTo(t.x + Math.cos(t.face - 2.5) * 10, t.y + Math.sin(t.face - 2.5) * 10);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = '#f2ead8';
-  ctx.beginPath();
-  ctx.arc(t.x + Math.cos(t.face) * 5, t.y + Math.sin(t.face) * 5, 3.5, 0, Math.PI * 2);
-  ctx.fill();
+  // A disguised Rook wears guard navy — the player is still the one
+  // with the gold collar.
+  drawMuseum(ctx, sprites, world.disguised ? 'rook_disguised' : 'rook_topdown', t.x, t.y, 2);
   if (t.hack > 0) {
     ctx.strokeStyle = PALETTE.terminalHacked;
     ctx.lineWidth = 4;
@@ -369,70 +201,37 @@ function drawThief(ctx, world, time) {
   }
 }
 
-function drawRoom(ctx, world, time) {
-  const rng = mulberry32(7);
-  const tile = 64;
-  for (let ty = 0; ty < FIELD.height / tile; ty += 1) {
-    for (let tx = 0; tx < FIELD.width / tile; tx += 1) {
-      const shade = (tx + ty) % 2 === 0 ? PALETTE.floorLight : PALETTE.floorDark;
-      ctx.fillStyle = shade;
-      ctx.fillRect(tx * tile, ty * tile, tile, tile);
-      if (rng() < 0.12) {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
-        ctx.fillRect(tx * tile + 8, ty * tile + 8, tile - 16, tile - 16);
-      }
-    }
-  }
-  ctx.strokeStyle = PALETTE.floorEdge;
-  ctx.lineWidth = 1;
-  for (let x = 0; x <= FIELD.width; x += tile) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, FIELD.height);
-    ctx.stroke();
-  }
-  for (let y = 0; y <= FIELD.height; y += tile) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(FIELD.width, y);
-    ctx.stroke();
-  }
+function drawRoom(ctx, world, time, sprites) {
+  // Parquet in the galleries, veined marble in the vault hall: the floors
+  // are pixel-art tiles now, not one flat checkerboard.
+  ctx.fillStyle = museumPattern(ctx, sprites, 'parquet_tile');
+  ctx.fillRect(0, 0, FIELD.width, FIELD.height);
+  ctx.fillStyle = museumPattern(ctx, sprites, 'marble_tile');
+  ctx.fillRect(420, 24, 440, 672);
+  // The marble reads pale against the night; deepen the hall a little so
+  // the gold trim and the room label sit on it.
+  ctx.fillStyle = 'rgba(20, 16, 30, 0.22)';
+  ctx.fillRect(420, 24, 440, 672);
   // The three rooms read apart: warm west gallery, cool east gallery.
   ctx.fillStyle = PALETTE.zoneWest;
   ctx.fillRect(24, 24, 396, 672);
   ctx.fillStyle = PALETTE.zoneEast;
   ctx.fillRect(860, 24, 396, 672);
-  ctx.fillStyle = 'rgba(242, 234, 216, 0.4)';
+  ctx.fillStyle = 'rgba(242, 234, 216, 0.55)';
   ctx.font = `bold 13px ${FONT}`;
   ctx.textAlign = 'center';
   ctx.fillText('W E S T   G A L L E R Y', 222, 100);
   ctx.fillText('T H E   V A U L T   H A L L', 640, 100);
   ctx.fillText('E A S T   G A L L E R Y', 1058, 100);
-  // Floors read apart per room, not one generic checkerboard: parquet
-  // planks in the galleries, veined marble in the vault hall, small rugs
-  // under the side loot.
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.18)';
-  ctx.lineWidth = 1;
-  for (let y = 56; y < 696; y += 32) {
-    ctx.beginPath();
-    ctx.moveTo(24, y);
-    ctx.lineTo(420, y);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(860, y);
-    ctx.lineTo(1256, y);
-    ctx.stroke();
+  // Warm pools under the three chandeliers.
+  for (const [lx, ly] of [[222, 140], [640, 140], [1058, 140]]) {
+    const pool = ctx.createRadialGradient(lx, ly, 10, lx, ly, 190);
+    pool.addColorStop(0, 'rgba(242, 201, 76, 0.07)');
+    pool.addColorStop(1, 'rgba(242, 201, 76, 0)');
+    ctx.fillStyle = pool;
+    ctx.fillRect(lx - 190, ly - 190, 380, 380);
   }
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-  for (let i = 0; i < 10; i += 1) {
-    const vx = 460 + rng() * 360;
-    const vy = 40 + rng() * 640;
-    ctx.beginPath();
-    ctx.moveTo(vx, vy);
-    ctx.lineTo(vx + 60 + rng() * 60, vy + 20 + rng() * 40);
-    ctx.stroke();
-  }
-  ctx.fillStyle = 'rgba(107, 31, 44, 0.85)';
+  ctx.fillStyle = museumPattern(ctx, sprites, 'carpet_tile');
   ctx.fillRect(96, 470, 140, 70);
   ctx.fillRect(1044, 470, 140, 70);
   ctx.strokeStyle = 'rgba(242, 201, 76, 0.6)';
@@ -440,7 +239,7 @@ function drawRoom(ctx, world, time) {
   ctx.strokeRect(96, 470, 140, 70);
   ctx.strokeRect(1044, 470, 140, 70);
   // Red carpet from the entrance to the diamond case.
-  ctx.fillStyle = PALETTE.carpet;
+  ctx.fillStyle = museumPattern(ctx, sprites, 'carpet_tile');
   ctx.fillRect(600, 364, 80, 332);
   ctx.strokeStyle = PALETTE.carpetEdge;
   ctx.lineWidth = 3;
@@ -524,29 +323,21 @@ function drawRoom(ctx, world, time) {
       ctx.stroke();
     }
   }
-  // The diamond's case gets a velvet rope.
+  // The diamond's case gets a velvet rope on two gold stanchions.
   ctx.strokeStyle = '#a83240';
   ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.moveTo(560, 392);
   ctx.quadraticCurveTo(640, 416, 720, 392);
   ctx.stroke();
-  ctx.fillStyle = '#c9a227';
-  ctx.beginPath();
-  ctx.arc(560, 392, 5, 0, Math.PI * 2);
-  ctx.arc(720, 392, 5, 0, Math.PI * 2);
-  ctx.fill();
-  // Potted palms in the corners.
+  drawMuseum(ctx, sprites, 'stanchion', 560, 392, 1.5);
+  drawMuseum(ctx, sprites, 'stanchion', 720, 392, 1.5);
+  // Potted palms in the corners, and benches under the high north windows.
   for (const [px, py] of [[64, 640], [1216, 640], [64, 80], [1216, 80]]) {
-    ctx.fillStyle = '#3f5a3a';
-    for (let i = 0; i < 5; i += 1) {
-      const a = -Math.PI / 2 + (i - 2) * 0.45;
-      ctx.beginPath();
-      ctx.ellipse(px + Math.cos(a) * 16, py + Math.sin(a) * 16, 12, 5, a, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.fillStyle = '#7a4a21';
-    ctx.fillRect(px - 9, py + 4, 18, 12);
+    drawMuseum(ctx, sprites, 'plant', px, py, 2);
+  }
+  for (const bx of [222, 640, 1058]) {
+    drawMuseum(ctx, sprites, 'bench', bx, 80, 2);
   }
   // EXIT door, glowing green at the bottom.
   const exitGlow = 0.55 + Math.sin(time * 2.5) * 0.2;
@@ -695,20 +486,26 @@ function bigText(ctx, title, subtitle, hint) {
 }
 
 /** Draw the whole frame for the world's current screen. */
-export function render(ctx, world, time, best) {
+export function render(ctx, world, time, best, sprites) {
   ctx.clearRect(0, 0, FIELD.width, FIELD.height);
-  drawRoom(ctx, world, time);
+  drawRoom(ctx, world, time, sprites);
   drawLasers(ctx, world, time);
-  for (const terminal of world.terminals) drawTerminal(ctx, terminal, time);
-  for (const cam of world.cameras) drawCamera(ctx, cam, world.camerasDown > 0);
-  for (const loot of world.loot) drawLoot(ctx, loot, time);
-  drawDisguiseRack(ctx, world);
-  for (const guard of world.guards) drawGuard(ctx, guard, time);
-  drawThief(ctx, world, time);
-  drawSmoke(ctx, world);
-  drawThrownCoins(ctx, world);
+  for (const terminal of world.terminals) drawTerminal(ctx, terminal, time, sprites);
+  for (const cam of world.cameras) drawCamera(ctx, cam, world.camerasDown > 0, sprites);
+  for (const loot of world.loot) drawLoot(ctx, loot, time, sprites);
+  drawDisguiseRack(ctx, world, sprites);
+  for (const guard of world.guards) drawGuard(ctx, guard, time, sprites);
+  drawThief(ctx, world, time, sprites);
+  drawSmoke(ctx, world, sprites);
+  drawThrownCoins(ctx, world, sprites);
   drawCrackDial(ctx, world);
   drawParticles(ctx, world);
+  // Vignette: the night closes in at the edges of the frame.
+  const vig = ctx.createRadialGradient(640, 386, 260, 640, 386, 720);
+  vig.addColorStop(0, 'rgba(10, 8, 16, 0)');
+  vig.addColorStop(1, 'rgba(10, 8, 16, 0.32)');
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, 0, FIELD.width, FIELD.height);
   if (world.alarm >= 70 && world.status === SCREEN_PLAY) {
     const pulse = 0.10 + Math.sin(time * 5) * 0.05;
     ctx.strokeStyle = `rgba(229, 83, 75, ${pulse + 0.15})`;

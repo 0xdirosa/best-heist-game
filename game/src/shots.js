@@ -131,8 +131,9 @@ export function stageShot(name, world) {
     // south-east, so a straight run south runs into his arms.
     simulate(world, CHASE_SECONDS, () => ({ mx: -0.5, my: 0.86, tx: null, ty: null }));
     // Smoke at Rook's feet, one bomb spent — the frame shows the escape tool
-    // in use, not just described in the rules.
-    world.smoke.push({ x: world.thief.x, y: world.thief.y, radius: SMOKE.radius, life: 4 });
+    // in use, not just described in the rules. Life 2.5 puts the cloud
+    // mid-billow, at full size, instead of the small puff it starts as.
+    world.smoke.push({ x: world.thief.x, y: world.thief.y, radius: SMOKE.radius, life: 2.5 });
     world.smokeBombs -= 1;
     return { screen: SCREEN_PLAY };
   }

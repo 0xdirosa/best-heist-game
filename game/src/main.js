@@ -6,6 +6,7 @@ import { BEST_KEY, FIELD, STEP } from './config.js';
 import { createAudio } from './audio.js';
 import { bindInput, createInput } from './input.js';
 import { render } from './render.js';
+import { loadSprites } from './sprites.js';
 import { stageShot } from './shots.js';
 import { SCREEN_BUSTED, SCREEN_CLEAR, SCREEN_PAUSED, SCREEN_PLAY, SCREEN_TITLE, SCREEN_WIN, createWorld, stepWorld } from './world.js';
 
@@ -121,15 +122,17 @@ function frame(now) {
   } else {
     audio.alarm(false);
   }
-  render(ctx, world, now / 1000, best);
+  render(ctx, world, now / 1000, best, sprites);
   window.requestAnimationFrame(frame);
 }
+
+const sprites = await loadSprites();
 
 if (shotName) {
   // Screenshot mode: stage one frame and draw it once, frozen.
   const staged = stageShot(shotName, world);
   world.status = staged.screen;
-  render(ctx, world, 4.2, best);
+  render(ctx, world, 4.2, best, sprites);
   document.title = `Meridian Midnight — shot ${shotName}`;
 } else {
   announce('Meridian Midnight. Press Enter to begin the heist.');
