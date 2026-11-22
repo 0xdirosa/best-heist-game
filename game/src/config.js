@@ -14,6 +14,33 @@ export const THIEF = {
   crackSeconds: 1.6,
 };
 
+/** The safe-cracking minigame: a needle sweeps a dial, and SPACE inside the
+ * gold zone lands a hit. Three hits crack the case; a miss spikes the alarm.
+ * The needle is driven by world time, so a staged replay always agrees. */
+export const CRACK = {
+  hitsNeeded: 3,
+  /** Seconds for one full sweep of the needle. */
+  needlePeriod: 0.9,
+  /** Width of the gold zone on the dial, in radians. */
+  zoneArc: 1.2,
+  /** Alarm jump for pressing SPACE outside the gold zone. */
+  missAlarm: 8,
+  /** How close Rook must stand to the diamond case to crack it. */
+  crackRange: 56,
+};
+
+/** A thrown coin: a limited tool that pulls nearby guards to investigate. */
+export const COIN = {
+  /** Coins Rook carries each night. */
+  count: 3,
+  /** How far ahead of Rook a thrown coin lands. */
+  throwRange: 150,
+  /** Guards this close to the landing spot come to look. */
+  investigateRadius: 280,
+  /** Seconds a guard investigates before giving up. */
+  investigateSeconds: 4,
+};
+
 /** Security terminals: stand at one and hold still to hack it. */
 export const TERMINAL = {
   radius: 16,
@@ -30,6 +57,8 @@ export const GUARD = {
   patrolSpeed: 72,
   chaseSpeed: 148,
   lockdownSpeed: 172,
+  /** Speed of a guard walking to a coin that clinked nearby. */
+  investigateSpeed: 96,
   /** Half-angle of a guard's vision cone, in radians. */
   coneHalf: 1.05,
   coneRange: 265,

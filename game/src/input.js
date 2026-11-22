@@ -8,6 +8,8 @@ export function createInput() {
     my: 0,
     tx: null,
     ty: null,
+    /** One-shot action for the next step: 'coin' or 'crack', consumed by the world. */
+    action: null,
     keys: new Set(),
   };
 }

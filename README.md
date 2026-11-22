@@ -17,9 +17,12 @@ Then open http://localhost:8080 in a desktop browser. No build step, no network 
 ## How to play
 
 - **WASD / arrow keys** move Rook, or **click** anywhere to walk there
-- **Guards** patrol the galleries — their yellow cones are what they can see. Get spotted and the alarm climbs; stay hidden and it falls.
+- **Guards** patrol the galleries — their yellow cones are what they can see. Get spotted and the alarm climbs; stay hidden and it falls. A suspicious guard says so out loud ("Huh?", "There he is!") before he gives chase.
 - **Cameras** sweep the halls with red cones. Stand at a **security terminal** (one on each side wall) and hold still for 2 seconds to hack it: every camera goes blind for 12 seconds, so the middle of the hall is safe to cross. **Lasers** (Night 2+) blink across the doorways — crossing a lit beam spikes the alarm.
-- Touch paintings, the golden bust, the vase and the idol to pocket them. Stand at the diamond case to crack it.
+- Each room connects to the next through **two door gaps**, so every crossing is a choice: the middle gap or the top gap, whichever the patrols leave open.
+- **Coins** are a limited tool — three a night. Press **C** to toss one ahead of you: any guard close enough leaves his patrol to investigate the clink.
+- The diamond case is a **timing crack**: a needle sweeps a dial, and **SPACE** inside the gold zone lands a hit. Three hits crack the case; a press outside the zone slips the pick and jumps the alarm.
+- The museum itself reacts: a low pulse quickens as the alarm rises, and every room has its own floor — parquet in the galleries, veined marble in the vault hall.
 - At **100% alarm** the museum locks down and every guard runs at you. If one catches you, the night is over.
 - Steal the diamond, then reach the green **EXIT**. Clear all three nights for the Perfect Heist — and keep the alarm under 50% for the $500 Ghost bonus.
 

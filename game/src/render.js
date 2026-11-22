@@ -1,7 +1,7 @@
 // Meridian Midnight: everything the player sees, drawn on one canvas.
 // The room, the cones, the loot, the HUD and every screen, all in 2D.
 
-import { ALARM, CAMERA, FIELD, FONT, GUARD, PALETTE, TERMINAL } from './config.js';
+import { ALARM, CAMERA, COIN, CRACK, FIELD, FONT, GUARD, PALETTE, TERMINAL } from './config.js';
 import { SCREEN_BUSTED, SCREEN_CLEAR, SCREEN_PAUSED, SCREEN_PLAY, SCREEN_TITLE, SCREEN_WIN } from './world.js';
 import { mulberry32 } from './random.js';
 
@@ -147,6 +147,61 @@ function drawLoot(ctx, loot, time) {
   ctx.restore();
 }
 
+function drawThrownCoins(ctx, world) {
+  for (const coin of world.thrownCoins) {
+    ctx.fillStyle = '#f2c94c';
+    ctx.beginPath();
+    ctx.arc(coin.x, coin.y, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#8a6d1f';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(coin.x, coin.y, 3, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(242, 201, 76, 0.6)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(coin.x, coin.y, 10 + Math.sin(world.time * 8) * 2, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
+/**
+ * The safe-crack dial, drawn around the diamond case while Rook stands at
+ * it: a sweeping needle, a gold zone, and one pip per landed hit.
+ */
+function drawCrackDial(ctx, world) {
+  const diamond = world.loot.find((l) => l.kind === 'diamond');
+  if (!diamond || diamond.taken) return;
+  const thief = world.thief;
+  const d = Math.hypot(thief.x - diamond.x, thief.y - diamond.y);
+  if (d >= CRACK.crackRange) return;
+  const needle = ((world.time / CRACK.needlePeriod) % 1) * Math.PI * 2;
+  const cx = diamond.x;
+  const cy = diamond.y;
+  ctx.fillStyle = 'rgba(10, 8, 16, 0.78)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 46, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#f2c94c';
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 40, world.crackZone, world.crackZone + CRACK.zoneArc);
+  ctx.stroke();
+  ctx.strokeStyle = '#f2ead8';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + Math.cos(needle) * 38, cy + Math.sin(needle) * 38);
+  ctx.stroke();
+  for (let i = 0; i < CRACK.hitsNeeded; i += 1) {
+    ctx.fillStyle = i < thief.crack ? '#f2c94c' : 'rgba(242, 234, 216, 0.25)';
+    ctx.beginPath();
+    ctx.arc(cx - 16 + i * 16, cy + 56, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
 function drawGuard(ctx, guard, time) {
   const alerted = guard.state === 'chase' || guard.state === 'suspect';
   drawCone(ctx, guard.x, guard.y, guard.dir, GUARD.coneHalf, GUARD.coneRange, alerted ? PALETTE.coneGuardAlert : PALETTE.coneGuard);
@@ -177,6 +232,15 @@ function drawGuard(ctx, guard, time) {
     ctx.font = `bold 20px ${FONT}`;
     ctx.textAlign = 'center';
     ctx.fillText(guard.state === 'chase' ? '!' : '?', guard.x, guard.y - 22 - Math.sin(time * 6) * 2);
+  }
+  if (guard.barkTimer > 0 && guard.bark) {
+    ctx.font = `bold 13px ${FONT}`;
+    ctx.textAlign = 'center';
+    const w = ctx.measureText(guard.bark).width + 12;
+    ctx.fillStyle = 'rgba(16, 24, 40, 0.85)';
+    ctx.fillRect(guard.x - w / 2, guard.y - 46, w, 18);
+    ctx.fillStyle = '#f2ead8';
+    ctx.fillText(guard.bark, guard.x, guard.y - 33);
   }
 }
 
@@ -247,13 +311,6 @@ function drawThief(ctx, world, time) {
   ctx.beginPath();
   ctx.arc(t.x + Math.cos(t.face) * 5, t.y + Math.sin(t.face) * 5, 3.5, 0, Math.PI * 2);
   ctx.fill();
-  if (t.crack > 0 && !world.loot.find((l) => l.kind === 'diamond').taken) {
-    ctx.strokeStyle = '#9be8ff';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.arc(t.x, t.y, 22, -Math.PI / 2, -Math.PI / 2 + (t.crack / 1.6) * Math.PI * 2);
-    ctx.stroke();
-  }
   if (t.hack > 0) {
     ctx.strokeStyle = PALETTE.terminalHacked;
     ctx.lineWidth = 4;
@@ -302,6 +359,37 @@ function drawRoom(ctx, world, time) {
   ctx.fillText('W E S T   G A L L E R Y', 222, 100);
   ctx.fillText('T H E   V A U L T   H A L L', 640, 100);
   ctx.fillText('E A S T   G A L L E R Y', 1058, 100);
+  // Floors read apart per room, not one generic checkerboard: parquet
+  // planks in the galleries, veined marble in the vault hall, small rugs
+  // under the side loot.
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.18)';
+  ctx.lineWidth = 1;
+  for (let y = 56; y < 696; y += 32) {
+    ctx.beginPath();
+    ctx.moveTo(24, y);
+    ctx.lineTo(420, y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(860, y);
+    ctx.lineTo(1256, y);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+  for (let i = 0; i < 10; i += 1) {
+    const vx = 460 + rng() * 360;
+    const vy = 40 + rng() * 640;
+    ctx.beginPath();
+    ctx.moveTo(vx, vy);
+    ctx.lineTo(vx + 60 + rng() * 60, vy + 20 + rng() * 40);
+    ctx.stroke();
+  }
+  ctx.fillStyle = 'rgba(107, 31, 44, 0.85)';
+  ctx.fillRect(96, 470, 140, 70);
+  ctx.fillRect(1044, 470, 140, 70);
+  ctx.strokeStyle = 'rgba(242, 201, 76, 0.6)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(96, 470, 140, 70);
+  ctx.strokeRect(1044, 470, 140, 70);
   // Red carpet from the entrance to the diamond case.
   ctx.fillStyle = PALETTE.carpet;
   ctx.fillRect(600, 364, 80, 332);
@@ -431,11 +519,11 @@ function drawHud(ctx, world) {
   ctx.font = `bold 13px ${FONT}`;
   ctx.textAlign = 'left';
   ctx.fillText(`${Math.floor(world.alarm)}%`, ax + aw + 10, 38);
-  // Loot and time.
+  // Loot, coins left, and time.
   ctx.textAlign = 'right';
   ctx.fillStyle = PALETTE.gold;
   ctx.font = `bold 18px ${FONT}`;
-  ctx.fillText(`LOOT $${world.lootValue.toLocaleString('en-US')}`, 1262, 26);
+  ctx.fillText(`LOOT $${world.lootValue.toLocaleString('en-US')}  ·  COINS ${'●'.repeat(world.coins)}${'○'.repeat(COIN.count - world.coins)}`, 1262, 26);
   ctx.fillStyle = PALETTE.muted;
   ctx.font = `13px ${FONT}`;
   const mins = Math.floor(world.time / 60);
@@ -461,7 +549,7 @@ function drawHud(ctx, world) {
   ctx.fillStyle = PALETTE.muted;
   ctx.font = `12px ${FONT}`;
   ctx.textAlign = 'right';
-  ctx.fillText('WASD / arrows move · click to walk · hack a terminal to blind the cameras · M sound · P pause', 1262, 70);
+  ctx.fillText('WASD / arrows move · click to walk · SPACE crack the case · C throw a coin · M sound · P pause', 1262, 70);
 }
 
 function drawParticles(ctx, world) {
@@ -546,6 +634,8 @@ export function render(ctx, world, time, best) {
   for (const loot of world.loot) drawLoot(ctx, loot, time);
   for (const guard of world.guards) drawGuard(ctx, guard, time);
   drawThief(ctx, world, time);
+  drawThrownCoins(ctx, world);
+  drawCrackDial(ctx, world);
   drawParticles(ctx, world);
   if (world.alarm >= 70 && world.status === SCREEN_PLAY) {
     const pulse = 0.10 + Math.sin(time * 5) * 0.05;
@@ -574,13 +664,13 @@ export function render(ctx, world, time, best) {
     ctx.fillText('One thief. One diamond. Three nights in the Meridian Museum.', FIELD.width / 2, 375);
     ctx.fillStyle = PALETTE.text;
     ctx.font = `17px ${FONT}`;
-    ctx.fillText('Dodge the guards’ cones, hack a terminal to blind the cameras, crack the case — and vanish.', FIELD.width / 2, 410);
+    ctx.fillText('Dodge the guards’ cones, toss a coin to pull one away, hack a terminal to blind the cameras, crack the case — and vanish.', FIELD.width / 2, 410);
     ctx.fillStyle = PALETTE.gold;
     ctx.font = `bold 20px ${FONT}`;
     ctx.fillText('Press ENTER to begin the heist', FIELD.width / 2, 470);
     ctx.fillStyle = PALETTE.muted;
     ctx.font = `15px ${FONT}`;
-    ctx.fillText('WASD / arrows or click to move  ·  M sound  ·  P pause', FIELD.width / 2, 505);
+    ctx.fillText('WASD / arrows or click to move  ·  SPACE crack the case  ·  C throw a coin  ·  M sound  ·  P pause', FIELD.width / 2, 505);
     if (best > 0) {
       ctx.fillStyle = PALETTE.gold;
       ctx.font = `16px ${FONT}`;

@@ -1,7 +1,7 @@
 // Meridian Midnight: the museum, its guards, cameras, lasers and loot.
 // One fixed step of simulation, pure rules, no drawing and no input devices.
 
-import { ALARM, CAMERA, FIELD, GUARD, LOOT_VALUES, NIGHTS, STEP, TERMINAL, THIEF } from './config.js';
+import { ALARM, CAMERA, COIN, CRACK, FIELD, GUARD, LOOT_VALUES, NIGHTS, STEP, TERMINAL, THIEF } from './config.js';
 import { angleDiff, angleTo, clamp, dist, mulberry32 } from './random.js';
 
 /** Screens the game can be on. */
@@ -80,9 +80,11 @@ export function buildSolids() {
     { x: 668, y: 696, w: 612, h: 24 },
     { x: 0, y: 0, w: 24, h: 720 },
     { x: 1256, y: 0, w: 24, h: 720 },
-    { x: 420, y: 24, w: 24, h: 296 },
+    { x: 420, y: 24, w: 24, h: 96 },
+    { x: 420, y: 200, w: 24, h: 120 },
     { x: 420, y: 400, w: 24, h: 296 },
-    { x: 836, y: 24, w: 24, h: 296 },
+    { x: 836, y: 24, w: 24, h: 96 },
+    { x: 836, y: 200, w: 24, h: 120 },
     { x: 836, y: 400, w: 24, h: 296 },
     { x: 560, y: 120, w: 160, h: 16 },
     { x: 560, y: 560, w: 160, h: 16 },
@@ -109,6 +111,20 @@ export function buildLoot(rng) {
   ];
 }
 
+/** True when an angle lies inside the arc [start, start + arc], wrapping. */
+function angleInZone(angle, start, arc) {
+  let d = angle - start;
+  while (d < 0) d += Math.PI * 2;
+  while (d >= Math.PI * 2) d -= Math.PI * 2;
+  return d <= arc;
+}
+
+/** A guard's one-liner when his state changes; it shows in the frame. */
+function setBark(guard, text) {
+  guard.bark = text;
+  guard.barkTimer = 1.6;
+}
+
 function makeGuard(waypoints, speedScale) {
   return {
     x: waypoints[0][0],
@@ -121,6 +137,10 @@ function makeGuard(waypoints, speedScale) {
     state: 'patrol',
     exposure: 0,
     loseTimer: 0,
+    investigateTimer: 0,
+    coinTarget: null,
+    bark: '',
+    barkTimer: 0,
     lastSeen: { x: waypoints[0][0], y: waypoints[0][1] },
     speedScale,
   };
@@ -170,6 +190,11 @@ export function createWorld(night, seed) {
     // goes blind for a while, so the middle of the hall is safe to cross.
     terminals: [makeTerminal(46, 360), makeTerminal(1234, 360)],
     camerasDown: 0,
+    // Coins are a limited tool: three a night, thrown ahead of Rook.
+    coins: COIN.count,
+    thrownCoins: [],
+    // Where the safe-crack dial's gold zone starts; it jumps on every hit.
+    crackZone: 0.5,
     thief: { x: 640, y: 660, radius: THIEF.radius, crack: 0, hack: 0, moving: false, face: -Math.PI / 2 },
     alarm: 0,
     alarmPeak: 0,
@@ -217,6 +242,10 @@ function burst(world, x, y, colour, count) {
 export function stepWorld(world, input, dt) {
   if (world.status !== SCREEN_PLAY) return;
   world.time += dt;
+  // A one-shot action (C for a coin, SPACE for the safe) is consumed here,
+  // so a press never fires twice and never lingers into a later step.
+  const action = input.action;
+  input.action = null;
   const thief = world.thief;
 
   // --- Move the thief: keys steer, a mouse click sets a target to walk to.
@@ -242,25 +271,28 @@ export function stepWorld(world, input, dt) {
     moveBody(thief, nx * THIEF.speed * dt, ny * THIEF.speed * dt, world);
   }
 
-  // --- Loot: touch to grab; the diamond needs a steady crack.
+  // --- Coins: a limited tool. C throws one ahead of Rook; guards close to
+  // where it lands leave their patrol to investigate it.
+  if (action === 'coin' && world.coins > 0) {
+    world.coins -= 1;
+    const cx = clamp(thief.x + Math.cos(thief.face) * COIN.throwRange, 40, FIELD.width - 40);
+    const cy = clamp(thief.y + Math.sin(thief.face) * COIN.throwRange, 40, FIELD.height - 40);
+    const coin = { x: cx, y: cy, radius: 5, life: COIN.investigateSeconds + 2 };
+    resolveCircle(coin, world.solids);
+    world.thrownCoins.push(coin);
+    world.floaters.push({ x: cx, y: cy - 14, text: 'clink!', life: 1, max: 1 });
+  }
+  for (const coin of world.thrownCoins) coin.life -= dt;
+  world.thrownCoins = world.thrownCoins.filter((c) => c.life > 0);
+
+  // --- Loot: touch to grab; the diamond needs the crack minigame.
   const diamond = world.loot.find((l) => l.kind === 'diamond');
   let nearDiamond = false;
   for (const item of world.loot) {
     if (item.taken) continue;
     const d = dist(thief.x, thief.y, item.x, item.y);
     if (item.kind === 'diamond') {
-      if (d < 52) {
-        nearDiamond = true;
-        thief.crack += dt;
-        if (thief.crack >= THIEF.crackSeconds) {
-          item.taken = true;
-          world.lootValue += item.value;
-          burst(world, item.x, item.y, '#9be8ff', 26);
-          world.floaters.push({ x: item.x, y: item.y - 20, text: `+$${item.value}`, life: 1.4, max: 1.4 });
-          world.message = 'The Star of Meridian is yours — get to the EXIT!';
-          world.messageTimer = 3.5;
-        }
-      }
+      if (d < CRACK.crackRange) nearDiamond = true;
       continue;
     }
     if (d < 44) {
@@ -270,7 +302,36 @@ export function stepWorld(world, input, dt) {
       world.floaters.push({ x: item.x, y: item.y - 20, text: `+$${item.value}`, life: 1.4, max: 1.4 });
     }
   }
-  if (!nearDiamond) thief.crack = Math.max(0, thief.crack - dt * 1.5);
+
+  // --- The diamond case: a timing minigame, not a timer. The needle sweeps
+  // the dial once per CRACK.needlePeriod; SPACE inside the gold zone lands
+  // one of three hits, SPACE outside it spikes the alarm and loses a hit.
+  if (nearDiamond && !diamond.taken) {
+    const needle = ((world.time / CRACK.needlePeriod) % 1) * Math.PI * 2;
+    if (action === 'crack') {
+      if (angleInZone(needle, world.crackZone, CRACK.zoneArc)) {
+        thief.crack += 1;
+        world.crackZone = Math.random() * Math.PI * 2;
+        // One CRACK floater at a time, above the dial: the previous hit's
+        // floater is still alive when the next lands, and they would stack.
+        world.floaters = world.floaters.filter((f) => !f.text.startsWith('CRACK'));
+        world.floaters.push({ x: diamond.x, y: diamond.y - 56, text: `CRACK ${thief.crack}/3`, life: 1.1, max: 1.1 });
+        if (thief.crack >= CRACK.hitsNeeded) {
+          diamond.taken = true;
+          world.lootValue += diamond.value;
+          burst(world, diamond.x, diamond.y, '#9be8ff', 26);
+          world.floaters.push({ x: diamond.x, y: diamond.y - 20, text: `+$${diamond.value}`, life: 1.4, max: 1.4 });
+          world.message = 'The Star of Meridian is yours — get to the EXIT!';
+          world.messageTimer = 3.5;
+        }
+      } else {
+        thief.crack = Math.max(0, thief.crack - 1);
+        world.alarm = Math.min(100, world.alarm + CRACK.missAlarm);
+        world.message = 'The pick slipped — the alarm jumps!';
+        world.messageTimer = 1.6;
+      }
+    }
+  }
 
   // --- Terminals: stand at one and hold still to hack it; every camera
   // goes blind for TERMINAL.downSeconds. One hack per terminal per night.
@@ -316,25 +377,59 @@ export function stepWorld(world, input, dt) {
       guard.exposure = Math.max(0, guard.exposure - dt * 0.8);
       if (guard.state === 'chase') guard.loseTimer += dt;
     }
-    const speed = (world.lockdown > 0 ? GUARD.lockdownSpeed : guard.state === 'chase' ? GUARD.chaseSpeed : GUARD.patrolSpeed) * guard.speedScale;
+    if (guard.barkTimer > 0) guard.barkTimer -= dt;
+    const speed = (world.lockdown > 0 ? GUARD.lockdownSpeed : guard.state === 'chase' ? GUARD.chaseSpeed : guard.state === 'investigate' ? GUARD.investigateSpeed : GUARD.patrolSpeed) * guard.speedScale;
     if (world.lockdown > 0 || guard.exposure >= GUARD.chaseExposure) {
+      if (guard.state !== 'chase') setBark(guard, 'There he is!');
       guard.state = 'chase';
     } else if (guard.exposure >= GUARD.suspectExposure && guard.state === 'patrol') {
+      setBark(guard, 'Huh?');
       guard.state = 'suspect';
     }
     if (guard.state === 'chase' && guard.loseTimer > GUARD.loseSightSeconds && world.lockdown <= 0) {
+      setBark(guard, "Where'd he go?");
       guard.state = 'suspect';
       guard.loseTimer = 0;
     }
+    // A clinked coin pulls a patrolling, suspicious or returning guard away
+    // from his route; a chasing guard ignores it.
+    if (guard.state === 'patrol' || guard.state === 'suspect' || guard.state === 'return') {
+      for (const coin of world.thrownCoins) {
+        if (dist(guard.x, guard.y, coin.x, coin.y) < COIN.investigateRadius) {
+          guard.state = 'investigate';
+          guard.coinTarget = coin;
+          guard.investigateTimer = COIN.investigateSeconds;
+          setBark(guard, "What's that?");
+          break;
+        }
+      }
+    }
     let tx;
     let ty;
-    if (guard.state === 'chase') {
+    if (guard.state === 'investigate') {
+      guard.investigateTimer -= dt;
+      const coin = guard.coinTarget;
+      if (!coin || coin.life <= 0 || guard.investigateTimer <= 0) {
+        setBark(guard, 'Must’ve been rats.');
+        guard.state = 'return';
+        guard.coinTarget = null;
+        const wp = guard.waypoints[guard.wp];
+        tx = wp[0];
+        ty = wp[1];
+      } else {
+        tx = coin.x;
+        ty = coin.y;
+      }
+    } else if (guard.state === 'chase') {
       tx = thief.x;
       ty = thief.y;
     } else if (guard.state === 'suspect') {
       tx = guard.lastSeen.x;
       ty = guard.lastSeen.y;
-      if (dist(guard.x, guard.y, tx, ty) < 18) guard.state = 'return';
+      if (dist(guard.x, guard.y, tx, ty) < 18) {
+        setBark(guard, 'Must’ve been rats.');
+        guard.state = 'return';
+      }
     } else if (guard.state === 'return') {
       const wp = guard.waypoints[guard.wp];
       tx = wp[0];

@@ -74,6 +74,14 @@ function onKey(code) {
     }
     return;
   }
+  if (code === 'KeyC' && world.status === SCREEN_PLAY) {
+    input.action = 'coin';
+    return;
+  }
+  if (code === 'Space' && world.status === SCREEN_PLAY) {
+    input.action = 'crack';
+    return;
+  }
   if (code === 'KeyP' && (world.status === SCREEN_PLAY || world.status === SCREEN_PAUSED)) {
     world.status = world.status === SCREEN_PLAY ? SCREEN_PAUSED : SCREEN_PLAY;
     announce(world.status === SCREEN_PAUSED ? 'Paused.' : 'Back to the heist.');
@@ -95,6 +103,7 @@ function frame(now) {
       if (world.status !== SCREEN_PLAY) break;
     }
     audio.alarm(world.alarm >= 70);
+    audio.tension(dt, world.alarm);
     if (world.status === SCREEN_BUSTED) {
       audio.alarm(false);
       audio.busted();

@@ -51,6 +51,18 @@ export function createAudio() {
     win() {
       [523, 659, 784, 1046].forEach((f, i) => this.tone(f, 0.35, 'sine', 0.15, i * 0.12));
     },
+    /** A low pulse under the game: it quickens and grows as the alarm rises.
+     * Call every frame with the frame time and the alarm meter. */
+    beatTimer: 0,
+    tension(dt, alarm) {
+      if (!this.ctx || this.muted) return;
+      this.beatTimer -= dt;
+      if (this.beatTimer > 0) return;
+      // One beat every 0.55s when calm, every 0.28s at full alarm.
+      this.beatTimer = 0.55 - (alarm / 100) * 0.27;
+      this.tone(55, 0.14, 'triangle', 0.05 + (alarm / 100) * 0.06);
+      if (alarm >= 70) this.tone(1200, 0.03, 'sine', 0.03);
+    },
     /** The alarm siren while the meter is high; call every frame, it manages itself. */
     alarm(on) {
       if (!this.ctx || this.muted) {
