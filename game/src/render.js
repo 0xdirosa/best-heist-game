@@ -304,13 +304,43 @@ function drawTerminal(ctx, terminal, time) {
   ctx.fillText(hacked ? 'OFFLINE' : 'SEC-01', terminal.x, terminal.y + 30);
 }
 
+/** The uniform rack in the east gallery: a blue uniform on a hook, or an
+ * empty hook once Rook is wearing it. */
+function drawDisguiseRack(ctx, world) {
+  const rack = world.disguiseRack;
+  ctx.fillStyle = '#241f2e';
+  ctx.fillRect(rack.x - 3, rack.y - 22, 6, 44);
+  ctx.fillStyle = '#c9a227';
+  ctx.beginPath();
+  ctx.arc(rack.x, rack.y - 22, 3, 0, Math.PI * 2);
+  ctx.fill();
+  if (!rack.taken) {
+    ctx.fillStyle = PALETTE.guard;
+    ctx.beginPath();
+    ctx.moveTo(rack.x - 11, rack.y - 14);
+    ctx.lineTo(rack.x + 11, rack.y - 14);
+    ctx.lineTo(rack.x + 14, rack.y + 14);
+    ctx.lineTo(rack.x - 14, rack.y + 14);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = PALETTE.guardTrim;
+    ctx.fillRect(rack.x - 11, rack.y - 8, 22, 3);
+    ctx.fillStyle = '#c9a227';
+    ctx.font = `bold 9px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.fillText('UNIFORM', rack.x, rack.y + 28);
+  }
+}
+
 function drawThief(ctx, world, time) {
   const t = world.thief;
   ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
   ctx.beginPath();
   ctx.ellipse(t.x, t.y + 10, 14, 5, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = PALETTE.thief;
+  // A disguised Rook wears guard blue, gold ring and all — the player is
+  // still the one with the gold ring.
+  ctx.fillStyle = world.disguised ? PALETTE.guard : PALETTE.thief;
   ctx.beginPath();
   ctx.arc(t.x, t.y, t.radius, 0, Math.PI * 2);
   ctx.fill();
@@ -441,6 +471,21 @@ function drawRoom(ctx, world, time) {
   ctx.lineTo(760, 520);
   ctx.closePath();
   ctx.fill();
+  // Patrol routes, dotted on the floor: the cones are what a guard sees,
+  // the dots are where he walks — read them before you move.
+  ctx.strokeStyle = 'rgba(242, 234, 216, 0.16)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 8]);
+  for (const guard of world.guards) {
+    ctx.beginPath();
+    guard.waypoints.forEach(([wx, wy], i) => {
+      if (i === 0) ctx.moveTo(wx, wy);
+      else ctx.lineTo(wx, wy);
+    });
+    ctx.closePath();
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
   // Walls with gold trim.
   ctx.fillStyle = PALETTE.wall;
   for (const s of world.solids) {
@@ -560,6 +605,12 @@ function drawHud(ctx, world) {
   ctx.fillStyle = PALETTE.muted;
   const objective = diamond.taken ? 'The Star is yours — reach the green EXIT!' : 'Steal the Star of Meridian diamond, then reach the EXIT.';
   ctx.fillText(objective, 18, 70);
+  if (world.disguised) {
+    const w = ctx.measureText(objective).width;
+    ctx.fillStyle = PALETTE.guardTrim;
+    ctx.font = `bold 13px ${FONT}`;
+    ctx.fillText(' · DISGUISED', 18 + w, 70);
+  }
   if (world.messageTimer > 0 && world.message) {
     ctx.fillStyle = world.alarm >= 70 ? '#ff8a80' : PALETTE.gold;
     ctx.font = `bold 15px ${FONT}`;
@@ -651,6 +702,7 @@ export function render(ctx, world, time, best) {
   for (const terminal of world.terminals) drawTerminal(ctx, terminal, time);
   for (const cam of world.cameras) drawCamera(ctx, cam, world.camerasDown > 0);
   for (const loot of world.loot) drawLoot(ctx, loot, time);
+  drawDisguiseRack(ctx, world);
   for (const guard of world.guards) drawGuard(ctx, guard, time);
   drawThief(ctx, world, time);
   drawSmoke(ctx, world);
@@ -684,7 +736,7 @@ export function render(ctx, world, time, best) {
     ctx.fillText('One thief. One diamond. Three nights in the Meridian Museum.', FIELD.width / 2, 375);
     ctx.fillStyle = PALETTE.text;
     ctx.font = `17px ${FONT}`;
-    ctx.fillText('Dodge the guards’ cones, toss a coin to pull one away, drop smoke to vanish, hack a terminal to blind the cameras, crack the case — and vanish.', FIELD.width / 2, 410);
+    ctx.fillText('Dodge the cones, toss a coin, drop smoke, wear a guard’s uniform, hack a terminal, crack the case — and vanish.', FIELD.width / 2, 410);
     ctx.fillStyle = PALETTE.gold;
     ctx.font = `bold 20px ${FONT}`;
     ctx.fillText('Press ENTER to begin the heist', FIELD.width / 2, 470);

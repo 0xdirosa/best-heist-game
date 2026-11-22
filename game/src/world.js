@@ -1,7 +1,7 @@
 // Meridian Midnight: the museum, its guards, cameras, lasers and loot.
 // One fixed step of simulation, pure rules, no drawing and no input devices.
 
-import { ALARM, CAMERA, COIN, CRACK, FIELD, GUARD, LOOT_VALUES, NIGHTS, SMOKE, STEP, TERMINAL, THIEF } from './config.js';
+import { ALARM, CAMERA, COIN, CRACK, DISGUISE, FIELD, GUARD, LOOT_VALUES, NIGHTS, SMOKE, STEP, TERMINAL, THIEF } from './config.js';
 import { angleDiff, angleTo, clamp, dist, mulberry32 } from './random.js';
 
 /** Screens the game can be on. */
@@ -209,6 +209,10 @@ export function createWorld(night, seed) {
     // Smoke bombs are a limited tool: two a night, dropped at Rook's feet.
     smokeBombs: SMOKE.count,
     smoke: [],
+    // A guard's uniform hangs on a rack in the east gallery; wearing it
+    // makes guards look straight past Rook unless he comes close.
+    disguised: false,
+    disguiseRack: { x: DISGUISE.rackX, y: DISGUISE.rackY, taken: false },
     // Where the safe-crack dial's gold zone starts; it jumps on every hit.
     crackZone: 0.5,
     thief: { x: 640, y: 660, radius: THIEF.radius, crack: 0, hack: 0, moving: false, face: -Math.PI / 2 },
@@ -327,6 +331,16 @@ export function stepWorld(world, input, dt) {
   for (const cloud of world.smoke) cloud.life -= dt;
   world.smoke = world.smoke.filter((c) => c.life > 0);
 
+  // --- The uniform: walk over the rack to wear it. One per night.
+  const rack = world.disguiseRack;
+  if (!rack.taken && dist(thief.x, thief.y, rack.x, rack.y) < DISGUISE.pickupRange) {
+    rack.taken = true;
+    world.disguised = true;
+    world.floaters.push({ x: thief.x, y: thief.y - 24, text: 'DISGUISED!', life: 1.6, max: 1.6 });
+    world.message = "Guard uniform — they won't look twice... unless you're close.";
+    world.messageTimer = 3;
+  }
+
   // --- Loot: touch to grab; the diamond needs the crack minigame.
   const diamond = world.loot.find((l) => l.kind === 'diamond');
   let nearDiamond = false;
@@ -363,6 +377,11 @@ export function stepWorld(world, input, dt) {
           world.lootValue += diamond.value;
           burst(world, diamond.x, diamond.y, '#9be8ff', 26);
           world.floaters.push({ x: diamond.x, y: diamond.y - 20, text: `+$${diamond.value}`, life: 1.4, max: 1.4 });
+          // The Star is too obvious to hide: taking it blows the cover.
+          if (world.disguised) {
+            world.disguised = false;
+            world.floaters.push({ x: thief.x, y: thief.y - 24, text: 'COVER BLOWN!', life: 1.6, max: 1.6 });
+          }
           world.message = 'The Star of Meridian is yours — get to the EXIT!';
           world.messageTimer = 3.5;
         }
@@ -409,7 +428,10 @@ export function stepWorld(world, input, dt) {
   // --- Guards patrol, suspect, chase.
   let seenByGuard = false;
   for (const guard of world.guards) {
-    const sees = canSee({ x: guard.x, y: guard.y, dir: guard.dir }, GUARD.coneRange, GUARD.coneHalf, world);
+    // A disguised Rook reads as a fellow guard past close range; cameras
+    // are machines and see straight through the uniform.
+    const sees = canSee({ x: guard.x, y: guard.y, dir: guard.dir }, GUARD.coneRange, GUARD.coneHalf, world)
+      && !(world.disguised && dist(guard.x, guard.y, thief.x, thief.y) > DISGUISE.closeRange);
     if (sees) {
       seenByGuard = true;
       guard.exposure += dt;

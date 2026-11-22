@@ -4,7 +4,7 @@
 // door gaps, so every frame is what a short game really looks like and the
 // same seed always gives the same frame.
 
-import { SCREEN_CLEAR, SCREEN_PLAY, stepWorld } from './world.js';
+import { SCREEN_PLAY, SCREEN_WIN, stepWorld } from './world.js';
 import { CRACK, SMOKE, STEP } from './config.js';
 
 const START_SECONDS = 1;
@@ -17,10 +17,14 @@ function zone(x) {
 }
 
 /** The door gap between two neighbouring rooms: the one nearer the thief,
- * so the autopilot uses both gaps the rooms offer. */
+ * so the autopilot uses both gaps the rooms offer. The waypoint sits 24px
+ * past the divider's far face — the old version aimed at the divider's
+ * centre, and the autopilot's "arrived" check (within 10px) fired while
+ * the thief still stood in the old room, so he waited at the door forever. */
 function doorBetween(a, b, y) {
   const low = Math.min(a, b);
-  const x = low === 0 ? 432 : 848;
+  const westFace = low === 0 ? 420 : 836;
+  const x = b > a ? westFace + 48 : westFace - 24;
   return { x, y: Math.abs(160 - y) < Math.abs(360 - y) ? 160 : 360 };
 }
 
@@ -81,6 +85,13 @@ export function stageShot(name, world) {
     world.status = SCREEN_PLAY;
     world.thief.x = 760;
     world.thief.y = 480;
+    // Rook is already in uniform for this shot — the frame shows the
+    // disguise in use at the case (blue Rook, DISGUISED badge). The pickup
+    // itself is proven by the node tests, not by a detour: walking to the
+    // rack first delays the crack into a camera sweep and the alarm jumps,
+    // and the play frame is supposed to be the calm one.
+    world.disguiseRack.taken = true;
+    world.disguised = true;
     // Freeze mid-crack: the dial, the needle and two filled pips show the
     // signature interaction in the frame; the win shot proves the full haul.
     const steps = Math.floor(PLAY_SECONDS / STEP);
@@ -126,6 +137,9 @@ export function stageShot(name, world) {
     return { screen: SCREEN_PLAY };
   }
   if (name === 'win') {
+    // Night 3, the perfect heist: every case empty across all three nights,
+    // the whole haul on the screen — the payoff frame, not one night's getaway.
+    world.night = 3;
     for (const item of world.loot) {
       if (!item.taken) {
         item.taken = true;
@@ -134,10 +148,10 @@ export function stageShot(name, world) {
     }
     world.thief.x = 640;
     world.thief.y = 684;
-    world.nightBonus = 840;
-    world.ghostBonus = 500;
-    world.status = SCREEN_CLEAR;
-    return { screen: SCREEN_CLEAR };
+    // Three nights of loot ($5,250 each) plus time and ghost bonuses.
+    world.score = 19770;
+    world.status = SCREEN_WIN;
+    return { screen: SCREEN_WIN };
   }
   world.status = SCREEN_PLAY;
   simulate(world, START_SECONDS, () => ({ mx: 0, my: -1, tx: null, ty: null }));

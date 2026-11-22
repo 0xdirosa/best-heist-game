@@ -53,6 +53,22 @@ export const SMOKE = {
   seconds: 5,
 };
 
+/** A guard's uniform on a rack in the east gallery: walk over it to wear
+ * it. Guards ignore a disguised Rook unless he comes close — cameras are
+ * machines and see straight through it — and the cover is blown the moment
+ * the diamond is taken. One uniform per night, and it never comes back.
+ * The rack stands south of the east stub, so the autopilot's straight
+ * walk to it never has to cross a wall. */
+export const DISGUISE = {
+  /** Where the rack stands. */
+  rackX: 1020,
+  rackY: 470,
+  /** How close Rook must walk to pick the uniform up. */
+  pickupRange: 30,
+  /** Inside this distance a guard sees through the disguise. */
+  closeRange: 70,
+};
+
 /** Security terminals: stand at one and hold still to hack it. */
 export const TERMINAL = {
   radius: 16,

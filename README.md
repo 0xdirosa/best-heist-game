@@ -22,7 +22,9 @@ Then open http://localhost:8080 in a desktop browser. No build step, no network 
 - Each room connects to the next through **two door gaps**, so every crossing is a choice: the middle gap or the top gap, whichever the patrols leave open.
 - **Coins** are a limited tool — three a night. Press **C** to toss one ahead of you: any guard close enough leaves his patrol to investigate the clink.
 - **Smoke bombs** are a second limited tool — two a night. Press **X** to drop one at your feet: the cloud hangs for 5 seconds and blinds every guard and camera whose sight crosses it, so a chase can be broken by vanishing inside it.
+- **A guard's uniform** hangs on a rack in the east gallery. Walk over it to wear it: guards look straight past you unless you come within a few steps — but cameras see through it, and the cover is blown the moment you take the Star. One uniform per night.
 - **Night 3 is the gala**: the museum rearranges the gallery — the paintings move into the vault hall flanking the diamond, and the bust, vase and idol rotate to the opposite pedestals. Same museum, different route, more guards, one more laser.
+- Every guard's **patrol route is dotted on the floor** — read the dots before you move.
 - The diamond case is a **timing crack**: a needle sweeps a dial, and **SPACE** inside the gold zone lands a hit. Three hits crack the case; a press outside the zone slips the pick and jumps the alarm.
 - The museum itself reacts: a low pulse quickens as the alarm rises, and every room has its own floor — parquet in the galleries, veined marble in the vault hall.
 - At **100% alarm** the museum locks down and every guard runs at you. If one catches you, the night is over.
