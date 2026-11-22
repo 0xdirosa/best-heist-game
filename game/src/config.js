@@ -14,6 +14,17 @@ export const THIEF = {
   crackSeconds: 1.6,
 };
 
+/** Security terminals: stand at one and hold still to hack it. */
+export const TERMINAL = {
+  radius: 16,
+  /** How close Rook must stand to hack a terminal. */
+  hackRange: 52,
+  /** Seconds of standing at a terminal to take the cameras down. */
+  hackSeconds: 2,
+  /** Seconds every camera stays blind after a hack. */
+  downSeconds: 12,
+};
+
 export const GUARD = {
   radius: 14,
   patrolSpeed: 72,
@@ -40,8 +51,7 @@ export const CAMERA = {
   sweepHalf: 0.85,
 };
 
-export const ALARM = {
-  /** Per second while any guard sees Rook. */
+export const ALARM = {  /** Per second while any guard sees Rook. */
   guardRate: 42,
   /** Per second while any camera sees Rook. */
   cameraRate: 26,
@@ -84,6 +94,12 @@ export const PALETTE = {
   coneGuard: 'rgba(242, 201, 76, 0.38)',
   coneGuardAlert: 'rgba(229, 83, 75, 0.42)',
   coneCamera: 'rgba(229, 83, 75, 0.30)',
+  coneCameraDown: 'rgba(140, 140, 150, 0.16)',
+  terminal: '#2a2f3a',
+  terminalScreen: '#f2c94c',
+  terminalHacked: '#58c98a',
+  zoneWest: 'rgba(242, 180, 90, 0.05)',
+  zoneEast: 'rgba(90, 160, 242, 0.05)',
   hud: 'rgba(10, 8, 16, 0.82)',
   text: '#f2ead8',
   muted: '#9a8fb0',

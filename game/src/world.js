@@ -1,7 +1,7 @@
 // Meridian Midnight: the museum, its guards, cameras, lasers and loot.
 // One fixed step of simulation, pure rules, no drawing and no input devices.
 
-import { ALARM, CAMERA, FIELD, GUARD, LOOT_VALUES, NIGHTS, STEP, THIEF } from './config.js';
+import { ALARM, CAMERA, FIELD, GUARD, LOOT_VALUES, NIGHTS, STEP, TERMINAL, THIEF } from './config.js';
 import { angleDiff, angleTo, clamp, dist, mulberry32 } from './random.js';
 
 /** Screens the game can be on. */
@@ -130,6 +130,10 @@ function makeCamera(x, y, baseAngle, phase) {
   return { x, y, baseAngle, angle: baseAngle, phase, seeing: false };
 }
 
+function makeTerminal(x, y) {
+  return { x, y, radius: TERMINAL.radius, hacked: false };
+}
+
 /** A fresh world for one night. Night 1, 2 and 3 add guards, a camera and lasers. */
 export function createWorld(night, seed) {
   const rng = mulberry32(seed);
@@ -162,7 +166,11 @@ export function createWorld(night, seed) {
     guards,
     cameras,
     lasers,
-    thief: { x: 640, y: 660, radius: THIEF.radius, crack: 0, moving: false, face: -Math.PI / 2 },
+    // One security terminal on each side wall: hack one and every camera
+    // goes blind for a while, so the middle of the hall is safe to cross.
+    terminals: [makeTerminal(46, 360), makeTerminal(1234, 360)],
+    camerasDown: 0,
+    thief: { x: 640, y: 660, radius: THIEF.radius, crack: 0, hack: 0, moving: false, face: -Math.PI / 2 },
     alarm: 0,
     alarmPeak: 0,
     lockdown: 0,
@@ -264,11 +272,34 @@ export function stepWorld(world, input, dt) {
   }
   if (!nearDiamond) thief.crack = Math.max(0, thief.crack - dt * 1.5);
 
-  // --- Cameras sweep and watch.
+  // --- Terminals: stand at one and hold still to hack it; every camera
+  // goes blind for TERMINAL.downSeconds. One hack per terminal per night.
+  let nearTerminal = null;
+  for (const terminal of world.terminals) {
+    if (terminal.hacked) continue;
+    if (dist(thief.x, thief.y, terminal.x, terminal.y) < TERMINAL.hackRange) nearTerminal = terminal;
+  }
+  if (nearTerminal) {
+    thief.hack += dt;
+    if (thief.hack >= TERMINAL.hackSeconds) {
+      nearTerminal.hacked = true;
+      thief.hack = 0;
+      world.camerasDown = TERMINAL.downSeconds;
+      burst(world, nearTerminal.x, nearTerminal.y, '#58c98a', 20);
+      world.floaters.push({ x: nearTerminal.x, y: nearTerminal.y - 24, text: 'CAMERAS DOWN', life: 1.6, max: 1.6 });
+      world.message = 'Security terminal hacked — cameras down for 12 seconds!';
+      world.messageTimer = 3;
+    }
+  } else {
+    thief.hack = Math.max(0, thief.hack - dt * 1.5);
+  }
+  if (world.camerasDown > 0) world.camerasDown -= dt;
+
+  // --- Cameras sweep and watch (blind while camerasDown runs).
   let seenByCamera = false;
   for (const cam of world.cameras) {
     cam.angle = cam.baseAngle + Math.sin(world.time * CAMERA.sweepSpeed + cam.phase) * CAMERA.sweepHalf;
-    cam.seeing = canSee({ x: cam.x, y: cam.y, angle: cam.angle }, CAMERA.coneRange, CAMERA.coneHalf, world);
+    cam.seeing = world.camerasDown > 0 ? false : canSee({ x: cam.x, y: cam.y, angle: cam.angle }, CAMERA.coneRange, CAMERA.coneHalf, world);
     if (cam.seeing) seenByCamera = true;
   }
 

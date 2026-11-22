@@ -1,7 +1,7 @@
 // Meridian Midnight: everything the player sees, drawn on one canvas.
 // The room, the cones, the loot, the HUD and every screen, all in 2D.
 
-import { ALARM, CAMERA, FIELD, FONT, GUARD, PALETTE } from './config.js';
+import { ALARM, CAMERA, FIELD, FONT, GUARD, PALETTE, TERMINAL } from './config.js';
 import { SCREEN_BUSTED, SCREEN_CLEAR, SCREEN_PAUSED, SCREEN_PLAY, SCREEN_TITLE, SCREEN_WIN } from './world.js';
 import { mulberry32 } from './random.js';
 
@@ -180,13 +180,13 @@ function drawGuard(ctx, guard, time) {
   }
 }
 
-function drawCamera(ctx, cam) {
-  drawCone(ctx, cam.x, cam.y, cam.angle, CAMERA.coneHalf, CAMERA.coneRange, PALETTE.coneCamera);
+function drawCamera(ctx, cam, down) {
+  drawCone(ctx, cam.x, cam.y, cam.angle, CAMERA.coneHalf, CAMERA.coneRange, down ? PALETTE.coneCameraDown : PALETTE.coneCamera);
   ctx.fillStyle = '#20242e';
   ctx.beginPath();
   ctx.arc(cam.x, cam.y, 10, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = cam.seeing ? '#ff5a4e' : '#e5534b';
+  ctx.fillStyle = down ? '#8a8f98' : cam.seeing ? '#ff5a4e' : '#e5534b';
   ctx.beginPath();
   ctx.arc(cam.x + Math.cos(cam.angle) * 12, cam.y + Math.sin(cam.angle) * 12, 5, 0, Math.PI * 2);
   ctx.fill();
@@ -194,6 +194,31 @@ function drawCamera(ctx, cam) {
   ctx.beginPath();
   ctx.arc(cam.x, cam.y, 3, 0, Math.PI * 2);
   ctx.fill();
+  // No OFFLINE label here: the grey cone and the HUD's CAMERAS DOWN badge
+  // already say it, and a label under the top cameras would sit on the
+  // objective line and under the bottom camera on the EXIT sign.
+}
+
+/** A security terminal on the wall: amber while live, green once hacked. */
+function drawTerminal(ctx, terminal, time) {
+  const hacked = terminal.hacked;
+  ctx.fillStyle = PALETTE.terminal;
+  ctx.fillRect(terminal.x - 14, terminal.y - 18, 28, 36);
+  ctx.strokeStyle = '#c9a227';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(terminal.x - 14, terminal.y - 18, 28, 36);
+  ctx.fillStyle = hacked ? PALETTE.terminalHacked : PALETTE.terminalScreen;
+  ctx.fillRect(terminal.x - 9, terminal.y - 13, 18, 12);
+  if (!hacked && Math.sin(time * 4) > 0) {
+    ctx.fillStyle = '#ff5a4e';
+    ctx.beginPath();
+    ctx.arc(terminal.x + 8, terminal.y + 8, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = hacked ? PALETTE.terminalHacked : PALETTE.muted;
+  ctx.font = `bold 9px ${FONT}`;
+  ctx.textAlign = 'center';
+  ctx.fillText(hacked ? 'OFFLINE' : 'SEC-01', terminal.x, terminal.y + 30);
 }
 
 function drawThief(ctx, world, time) {
@@ -229,6 +254,13 @@ function drawThief(ctx, world, time) {
     ctx.arc(t.x, t.y, 22, -Math.PI / 2, -Math.PI / 2 + (t.crack / 1.6) * Math.PI * 2);
     ctx.stroke();
   }
+  if (t.hack > 0) {
+    ctx.strokeStyle = PALETTE.terminalHacked;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, 22, -Math.PI / 2, -Math.PI / 2 + (t.hack / TERMINAL.hackSeconds) * Math.PI * 2);
+    ctx.stroke();
+  }
 }
 
 function drawRoom(ctx, world, time) {
@@ -259,6 +291,17 @@ function drawRoom(ctx, world, time) {
     ctx.lineTo(FIELD.width, y);
     ctx.stroke();
   }
+  // The three rooms read apart: warm west gallery, cool east gallery.
+  ctx.fillStyle = PALETTE.zoneWest;
+  ctx.fillRect(24, 24, 396, 672);
+  ctx.fillStyle = PALETTE.zoneEast;
+  ctx.fillRect(860, 24, 396, 672);
+  ctx.fillStyle = 'rgba(242, 234, 216, 0.4)';
+  ctx.font = `bold 13px ${FONT}`;
+  ctx.textAlign = 'center';
+  ctx.fillText('W E S T   G A L L E R Y', 222, 100);
+  ctx.fillText('T H E   V A U L T   H A L L', 640, 100);
+  ctx.fillText('E A S T   G A L L E R Y', 1058, 100);
   // Red carpet from the entrance to the diamond case.
   ctx.fillStyle = PALETTE.carpet;
   ctx.fillRect(600, 364, 80, 332);
@@ -398,6 +441,11 @@ function drawHud(ctx, world) {
   const mins = Math.floor(world.time / 60);
   const secs = Math.floor(world.time % 60);
   ctx.fillText(`${mins}:${String(secs).padStart(2, '0')}`, 1262, 44);
+  if (world.camerasDown > 0) {
+    ctx.fillStyle = PALETTE.terminalHacked;
+    ctx.font = `bold 13px ${FONT}`;
+    ctx.fillText(`CAMERAS DOWN ${Math.ceil(world.camerasDown)}s`, 1262, 88);
+  }
   // Objective and messages.
   const diamond = world.loot.find((l) => l.kind === 'diamond');
   ctx.textAlign = 'left';
@@ -413,7 +461,7 @@ function drawHud(ctx, world) {
   ctx.fillStyle = PALETTE.muted;
   ctx.font = `12px ${FONT}`;
   ctx.textAlign = 'right';
-  ctx.fillText('WASD / arrows move · click to walk · M sound · P pause', 1262, 70);
+  ctx.fillText('WASD / arrows move · click to walk · hack a terminal to blind the cameras · M sound · P pause', 1262, 70);
 }
 
 function drawParticles(ctx, world) {
@@ -493,7 +541,8 @@ export function render(ctx, world, time, best) {
   ctx.clearRect(0, 0, FIELD.width, FIELD.height);
   drawRoom(ctx, world, time);
   drawLasers(ctx, world, time);
-  for (const cam of world.cameras) drawCamera(ctx, cam);
+  for (const terminal of world.terminals) drawTerminal(ctx, terminal, time);
+  for (const cam of world.cameras) drawCamera(ctx, cam, world.camerasDown > 0);
   for (const loot of world.loot) drawLoot(ctx, loot, time);
   for (const guard of world.guards) drawGuard(ctx, guard, time);
   drawThief(ctx, world, time);
@@ -525,7 +574,7 @@ export function render(ctx, world, time, best) {
     ctx.fillText('One thief. One diamond. Three nights in the Meridian Museum.', FIELD.width / 2, 375);
     ctx.fillStyle = PALETTE.text;
     ctx.font = `17px ${FONT}`;
-    ctx.fillText('Dodge the guards’ cones, slip past the cameras, crack the case — and vanish.', FIELD.width / 2, 410);
+    ctx.fillText('Dodge the guards’ cones, hack a terminal to blind the cameras, crack the case — and vanish.', FIELD.width / 2, 410);
     ctx.fillStyle = PALETTE.gold;
     ctx.font = `bold 20px ${FONT}`;
     ctx.fillText('Press ENTER to begin the heist', FIELD.width / 2, 470);

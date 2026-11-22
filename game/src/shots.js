@@ -72,10 +72,14 @@ export function stageShot(name, world) {
     return { screen: SCREEN_PLAY };
   }
   if (name === 'chase') {
+    // Night 2: five guards, four cameras, two lasers — and Rook has just
+    // hacked the west terminal, so the cameras are blind while he runs.
     world.status = SCREEN_PLAY;
     const diamond = world.loot.find((l) => l.kind === 'diamond');
     diamond.taken = true;
     world.lootValue += diamond.value;
+    world.terminals[0].hacked = true;
+    world.camerasDown = 9;
     world.thief.x = 760;
     world.thief.y = 480;
     world.alarm = 84;

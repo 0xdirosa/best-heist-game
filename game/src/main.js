@@ -15,10 +15,11 @@ const ctx = canvas.getContext('2d');
 const params = new URLSearchParams(window.location.search);
 const shotName = params.get('shot');
 const seed = Number(params.get('seed') || 1) || 1;
+const night = Number(params.get('night') || 1) || 1;
 
 const audio = createAudio();
 const input = createInput();
-let world = createWorld(1, seed);
+let world = createWorld(night, seed);
 let best = 0;
 try {
   best = Number(window.localStorage.getItem(BEST_KEY) || 0) || 0;
