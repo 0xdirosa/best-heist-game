@@ -1,7 +1,7 @@
 // Meridian Midnight: the museum, its guards, cameras, lasers and loot.
 // One fixed step of simulation, pure rules, no drawing and no input devices.
 
-import { ALARM, CAMERA, COIN, CRACK, FIELD, GUARD, LOOT_VALUES, NIGHTS, STEP, TERMINAL, THIEF } from './config.js';
+import { ALARM, CAMERA, COIN, CRACK, FIELD, GUARD, LOOT_VALUES, NIGHTS, SMOKE, STEP, TERMINAL, THIEF } from './config.js';
 import { angleDiff, angleTo, clamp, dist, mulberry32 } from './random.js';
 
 /** Screens the game can be on. */
@@ -99,9 +99,12 @@ export function buildSolids() {
   return solids;
 }
 
-/** Loot placed on the floor plan. `art` seeds each painting's miniature. */
-export function buildLoot(rng) {
-  return [
+/** Loot placed on the floor plan. `art` seeds each painting's miniature.
+ * Night 3 is the gala: the gallery is rearranged, so the paintings move
+ * into the vault hall flanking the diamond and the bust, vase and idol
+ * rotate to the opposite pedestals — the same museum, a different route. */
+export function buildLoot(rng, night = 1) {
+  const loot = [
     { id: 'painting-a', kind: 'painting', name: 'Portrait of the Duchess', x: 78, y: 150, value: LOOT_VALUES.painting, taken: false, art: Math.floor(rng() * 100000) },
     { id: 'painting-b', kind: 'painting', name: 'The Gilded Valley', x: 1202, y: 150, value: LOOT_VALUES.painting, taken: false, art: Math.floor(rng() * 100000) },
     { id: 'bust', kind: 'bust', name: 'Golden Bust of Aurelius', x: 195, y: 227, value: LOOT_VALUES.bust, taken: false, art: 0 },
@@ -109,6 +112,16 @@ export function buildLoot(rng) {
     { id: 'diamond', kind: 'diamond', name: 'The Star of Meridian', x: 640, y: 332, value: LOOT_VALUES.diamond, taken: false, art: 0 },
     { id: 'relic', kind: 'relic', name: 'Jade Jaguar Idol', x: 1085, y: 547, value: 650, taken: false, art: 0 },
   ];
+  if (night >= 3) {
+    const spot = { 'painting-a': [470, 120], 'painting-b': [810, 120], bust: [1085, 547], vase: [195, 227], relic: [195, 547] };
+    for (const item of loot) {
+      if (spot[item.id]) {
+        item.x = spot[item.id][0];
+        item.y = spot[item.id][1];
+      }
+    }
+  }
+  return loot;
 }
 
 /** True when an angle lies inside the arc [start, start + arc], wrapping. */
@@ -182,7 +195,7 @@ export function createWorld(night, seed) {
     night,
     seed,
     solids: buildSolids(),
-    loot: buildLoot(rng),
+    loot: buildLoot(rng, night),
     guards,
     cameras,
     lasers,
@@ -193,6 +206,9 @@ export function createWorld(night, seed) {
     // Coins are a limited tool: three a night, thrown ahead of Rook.
     coins: COIN.count,
     thrownCoins: [],
+    // Smoke bombs are a limited tool: two a night, dropped at Rook's feet.
+    smokeBombs: SMOKE.count,
+    smoke: [],
     // Where the safe-crack dial's gold zone starts; it jumps on every hit.
     crackZone: 0.5,
     thief: { x: 640, y: 660, radius: THIEF.radius, crack: 0, hack: 0, moving: false, face: -Math.PI / 2 },
@@ -213,11 +229,25 @@ export function createWorld(night, seed) {
   };
 }
 
-/** Can `eye` see the thief: in range, inside the cone, line of sight clear. */
+/** True when the segment (x1,y1)-(x2,y2) passes through the circle. */
+export function segmentHitsCircle(x1, y1, x2, y2, c) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len2 = dx * dx + dy * dy;
+  if (len2 === 0) return Math.hypot(c.x - x1, c.y - y1) < c.radius;
+  const t = clamp(((c.x - x1) * dx + (c.y - y1) * dy) / len2, 0, 1);
+  return Math.hypot(c.x - (x1 + dx * t), c.y - (y1 + dy * t)) < c.radius;
+}
+
+/** Can `eye` see the thief: in range, inside the cone, line of sight clear,
+ * and no smoke cloud between eye and thief. */
 export function canSee(eye, range, halfAngle, world) {
   const t = world.thief;
   if (dist(eye.x, eye.y, t.x, t.y) > range) return false;
   if (angleDiff(eye.dir ?? eye.angle, angleTo(eye.x, eye.y, t.x, t.y)) > halfAngle) return false;
+  for (const cloud of world.smoke) {
+    if (segmentHitsCircle(eye.x, eye.y, t.x, t.y, cloud)) return false;
+  }
   return lineOfSight(eye.x, eye.y, t.x, t.y, world.solids);
 }
 
@@ -284,6 +314,18 @@ export function stepWorld(world, input, dt) {
   }
   for (const coin of world.thrownCoins) coin.life -= dt;
   world.thrownCoins = world.thrownCoins.filter((c) => c.life > 0);
+
+  // --- Smoke: a limited tool. X drops one at Rook's feet; the cloud
+  // hangs for a few seconds and blinds every eye whose sight crosses it,
+  // so a chase can be broken by vanishing inside it.
+  if (action === 'smoke' && world.smokeBombs > 0) {
+    world.smokeBombs -= 1;
+    world.smoke.push({ x: thief.x, y: thief.y, radius: SMOKE.radius, life: SMOKE.seconds });
+    burst(world, thief.x, thief.y, '#c8c8d2', 14);
+    world.floaters.push({ x: thief.x, y: thief.y - 24, text: 'SMOKE!', life: 1.2, max: 1.2 });
+  }
+  for (const cloud of world.smoke) cloud.life -= dt;
+  world.smoke = world.smoke.filter((c) => c.life > 0);
 
   // --- Loot: touch to grab; the diamond needs the crack minigame.
   const diamond = world.loot.find((l) => l.kind === 'diamond');

@@ -5,7 +5,7 @@
 // same seed always gives the same frame.
 
 import { SCREEN_CLEAR, SCREEN_PLAY, stepWorld } from './world.js';
-import { CRACK, STEP } from './config.js';
+import { CRACK, SMOKE, STEP } from './config.js';
 
 const START_SECONDS = 1;
 const PLAY_SECONDS = 16;
@@ -92,8 +92,9 @@ export function stageShot(name, world) {
     return { screen: SCREEN_PLAY };
   }
   if (name === 'chase') {
-    // Night 2: five guards, four cameras, two lasers — and Rook has just
-    // hacked the west terminal, so the cameras are blind while he runs.
+    // Night 3, the gala: five guards, three lasers, the loot rearranged —
+    // and Rook has just hacked the west terminal, so the cameras are blind
+    // while he runs. He drops a smoke bomb at his feet as the guards close in.
     world.status = SCREEN_PLAY;
     const diamond = world.loot.find((l) => l.kind === 'diamond');
     diamond.taken = true;
@@ -118,6 +119,10 @@ export function stageShot(name, world) {
     // South-west, down the carpet toward the EXIT: the second chaser waits
     // south-east, so a straight run south runs into his arms.
     simulate(world, CHASE_SECONDS, () => ({ mx: -0.5, my: 0.86, tx: null, ty: null }));
+    // Smoke at Rook's feet, one bomb spent — the frame shows the escape tool
+    // in use, not just described in the rules.
+    world.smoke.push({ x: world.thief.x, y: world.thief.y, radius: SMOKE.radius, life: 4 });
+    world.smokeBombs -= 1;
     return { screen: SCREEN_PLAY };
   }
   if (name === 'win') {

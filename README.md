@@ -21,6 +21,8 @@ Then open http://localhost:8080 in a desktop browser. No build step, no network 
 - **Cameras** sweep the halls with red cones. Stand at a **security terminal** (one on each side wall) and hold still for 2 seconds to hack it: every camera goes blind for 12 seconds, so the middle of the hall is safe to cross. **Lasers** (Night 2+) blink across the doorways — crossing a lit beam spikes the alarm.
 - Each room connects to the next through **two door gaps**, so every crossing is a choice: the middle gap or the top gap, whichever the patrols leave open.
 - **Coins** are a limited tool — three a night. Press **C** to toss one ahead of you: any guard close enough leaves his patrol to investigate the clink.
+- **Smoke bombs** are a second limited tool — two a night. Press **X** to drop one at your feet: the cloud hangs for 5 seconds and blinds every guard and camera whose sight crosses it, so a chase can be broken by vanishing inside it.
+- **Night 3 is the gala**: the museum rearranges the gallery — the paintings move into the vault hall flanking the diamond, and the bust, vase and idol rotate to the opposite pedestals. Same museum, different route, more guards, one more laser.
 - The diamond case is a **timing crack**: a needle sweeps a dial, and **SPACE** inside the gold zone lands a hit. Three hits crack the case; a press outside the zone slips the pick and jumps the alarm.
 - The museum itself reacts: a low pulse quickens as the alarm rises, and every room has its own floor — parquet in the galleries, veined marble in the vault hall.
 - At **100% alarm** the museum locks down and every guard runs at you. If one catches you, the night is over.

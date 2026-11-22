@@ -1,7 +1,7 @@
 // Meridian Midnight: everything the player sees, drawn on one canvas.
 // The room, the cones, the loot, the HUD and every screen, all in 2D.
 
-import { ALARM, CAMERA, COIN, CRACK, FIELD, FONT, GUARD, PALETTE, TERMINAL } from './config.js';
+import { ALARM, CAMERA, COIN, CRACK, FIELD, FONT, GUARD, PALETTE, SMOKE, TERMINAL } from './config.js';
 import { SCREEN_BUSTED, SCREEN_CLEAR, SCREEN_PAUSED, SCREEN_PLAY, SCREEN_TITLE, SCREEN_WIN } from './world.js';
 import { mulberry32 } from './random.js';
 
@@ -163,6 +163,25 @@ function drawThrownCoins(ctx, world) {
     ctx.beginPath();
     ctx.arc(coin.x, coin.y, 10 + Math.sin(world.time * 8) * 2, 0, Math.PI * 2);
     ctx.stroke();
+  }
+}
+
+/** Smoke clouds, drawn over the thief: a grey veil that hides him. */
+function drawSmoke(ctx, world) {
+  for (const cloud of world.smoke) {
+    const fade = Math.min(1, cloud.life / 1.5);
+    ctx.globalAlpha = fade;
+    ctx.fillStyle = PALETTE.smoke;
+    ctx.beginPath();
+    ctx.arc(cloud.x, cloud.y, cloud.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = PALETTE.smokeCore;
+    ctx.beginPath();
+    ctx.arc(cloud.x - 26, cloud.y - 14, 42, 0, Math.PI * 2);
+    ctx.arc(cloud.x + 30, cloud.y + 10, 38, 0, Math.PI * 2);
+    ctx.arc(cloud.x + 6, cloud.y - 30, 34, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
   }
 }
 
@@ -519,11 +538,11 @@ function drawHud(ctx, world) {
   ctx.font = `bold 13px ${FONT}`;
   ctx.textAlign = 'left';
   ctx.fillText(`${Math.floor(world.alarm)}%`, ax + aw + 10, 38);
-  // Loot, coins left, and time.
+  // Loot, coins and smoke left, and time.
   ctx.textAlign = 'right';
   ctx.fillStyle = PALETTE.gold;
   ctx.font = `bold 18px ${FONT}`;
-  ctx.fillText(`LOOT $${world.lootValue.toLocaleString('en-US')}  ·  COINS ${'●'.repeat(world.coins)}${'○'.repeat(COIN.count - world.coins)}`, 1262, 26);
+  ctx.fillText(`LOOT $${world.lootValue.toLocaleString('en-US')}  ·  COINS ${'●'.repeat(world.coins)}${'○'.repeat(COIN.count - world.coins)}  ·  SMOKE ${'●'.repeat(world.smokeBombs)}${'○'.repeat(SMOKE.count - world.smokeBombs)}`, 1262, 26);
   ctx.fillStyle = PALETTE.muted;
   ctx.font = `13px ${FONT}`;
   const mins = Math.floor(world.time / 60);
@@ -549,7 +568,7 @@ function drawHud(ctx, world) {
   ctx.fillStyle = PALETTE.muted;
   ctx.font = `12px ${FONT}`;
   ctx.textAlign = 'right';
-  ctx.fillText('WASD / arrows move · click to walk · SPACE crack the case · C throw a coin · M sound · P pause', 1262, 70);
+  ctx.fillText('WASD / arrows move · click to walk · SPACE crack the case · C throw a coin · X smoke · M sound · P pause', 1262, 70);
 }
 
 function drawParticles(ctx, world) {
@@ -634,6 +653,7 @@ export function render(ctx, world, time, best) {
   for (const loot of world.loot) drawLoot(ctx, loot, time);
   for (const guard of world.guards) drawGuard(ctx, guard, time);
   drawThief(ctx, world, time);
+  drawSmoke(ctx, world);
   drawThrownCoins(ctx, world);
   drawCrackDial(ctx, world);
   drawParticles(ctx, world);
@@ -664,13 +684,13 @@ export function render(ctx, world, time, best) {
     ctx.fillText('One thief. One diamond. Three nights in the Meridian Museum.', FIELD.width / 2, 375);
     ctx.fillStyle = PALETTE.text;
     ctx.font = `17px ${FONT}`;
-    ctx.fillText('Dodge the guards’ cones, toss a coin to pull one away, hack a terminal to blind the cameras, crack the case — and vanish.', FIELD.width / 2, 410);
+    ctx.fillText('Dodge the guards’ cones, toss a coin to pull one away, drop smoke to vanish, hack a terminal to blind the cameras, crack the case — and vanish.', FIELD.width / 2, 410);
     ctx.fillStyle = PALETTE.gold;
     ctx.font = `bold 20px ${FONT}`;
     ctx.fillText('Press ENTER to begin the heist', FIELD.width / 2, 470);
     ctx.fillStyle = PALETTE.muted;
     ctx.font = `15px ${FONT}`;
-    ctx.fillText('WASD / arrows or click to move  ·  SPACE crack the case  ·  C throw a coin  ·  M sound  ·  P pause', FIELD.width / 2, 505);
+    ctx.fillText('WASD / arrows or click to move  ·  SPACE crack the case  ·  C throw a coin  ·  X drop smoke  ·  M sound  ·  P pause', FIELD.width / 2, 505);
     if (best > 0) {
       ctx.fillStyle = PALETTE.gold;
       ctx.font = `16px ${FONT}`;

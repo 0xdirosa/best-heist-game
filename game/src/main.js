@@ -78,6 +78,10 @@ function onKey(code) {
     input.action = 'coin';
     return;
   }
+  if (code === 'KeyX' && world.status === SCREEN_PLAY) {
+    input.action = 'smoke';
+    return;
+  }
   if (code === 'Space' && world.status === SCREEN_PLAY) {
     input.action = 'crack';
     return;

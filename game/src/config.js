@@ -41,6 +41,18 @@ export const COIN = {
   investigateSeconds: 4,
 };
 
+/** A smoke bomb: a limited tool that drops at Rook's feet and blinds every
+ * eye — guard or camera — whose line of sight crosses the cloud. Two a
+ * night, for the moment a chase has to end. */
+export const SMOKE = {
+  /** Smoke bombs Rook carries each night. */
+  count: 2,
+  /** Radius of the cloud, in pixels. */
+  radius: 95,
+  /** Seconds the cloud hangs in the air. */
+  seconds: 5,
+};
+
 /** Security terminals: stand at one and hold still to hack it. */
 export const TERMINAL = {
   radius: 16,
@@ -127,6 +139,8 @@ export const PALETTE = {
   terminal: '#2a2f3a',
   terminalScreen: '#f2c94c',
   terminalHacked: '#58c98a',
+  smoke: 'rgba(200, 200, 210, 0.30)',
+  smokeCore: 'rgba(224, 224, 232, 0.42)',
   zoneWest: 'rgba(242, 180, 90, 0.05)',
   zoneEast: 'rgba(90, 160, 242, 0.05)',
   hud: 'rgba(10, 8, 16, 0.82)',
